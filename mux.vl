@@ -1,0 +1,191 @@
+`define NUM_BITS 5
+
+module arithmetic_rightShift (output wire signed  [N:0] out,input wire signed [N:0] a );
+    parameter N = `NUM_BITS-1;
+    generate
+    genvar  i;
+    for (i = N-1; i>=0; i=i-1) begin
+        buf(out[i],a[i+1]);
+    end
+  
+    endgenerate
+    buf(out[N],a[N]);
+endmodule
+
+module Bitwise_AND (output wire [N:0] Y,input wire [N:0] A,input wire [N:0] B);  
+    parameter N = `NUM_BITS-1;  
+    genvar i;
+    for ( i = 0;i<=N ;i=i+1 ) begin
+        and(Y[i],A[i],B[i]);    
+    end
+    
+endmodule
+
+module Bitwise_OR (output wire [N:0] Y,input wire [N:0] A,input wire [N:0] B);
+    parameter N = `NUM_BITS-1;
+    genvar i;
+    for ( i = 0;i<=N ;i=i+1 ) begin
+        or(Y[i],A[i],B[i]);  
+    end
+endmodule
+
+module NOT (output wire[N:0] x, input wire[N:0] y);
+    parameter N = `NUM_BITS-1;
+    genvar i;
+    for(i=0;i<=N;i=i+1)begin
+        not(x[i],y[i]);
+    end
+   
+endmodule
+
+module half_adder(sum, carry, a, b);
+    input a, b;
+    output sum, carry;
+    xor(sum, a, b);
+    and(carry, a, b);
+endmodule
+
+module full_adder(output sum,output carry,input x,input y,input z);
+    wire s1, c1, c2;
+    half_adder h1(s1, c1, x, y);
+    half_adder h2(sum, c2, s1, z);
+    or(carry, c1, c2);
+endmodule
+
+module full_adder_nbit(output [N:0]sum,output carry,input wire[N:0]a,input wire[N:0]b,input d);
+parameter N = `NUM_BITS-1;
+   wire [N+1:0] c;
+   buf(c[0],d); 
+   generate
+   genvar i;
+   for(i=0;i<=N;i=i+1)
+   begin
+       full_adder f1(sum[i], c[i+1], a[i], b[i], c[i]);
+   end
+   endgenerate
+   buf(carry,c[N+1]);
+endmodule
+
+
+module BitWiseXor_n(output wire[N-1:0]out,input wire[N-1:0]in1,input wire[N-1:0]in2);
+    parameter N = `NUM_BITS;
+    generate
+    genvar i;
+    for(i=0;i<N;i=i+1)
+    begin
+        xor(out[i], in1[i], in2[i]);
+    end
+    endgenerate
+endmodule
+
+module logi(output[N:0]out,input x);
+    parameter N = `NUM_BITS-1;
+    generate
+        genvar i;
+        for (i = 0;i<=N ;i=i+1 ) begin
+            buf(out[i],x);
+        end
+    endgenerate
+endmodule
+
+module mux8x1(out, d0, d1, d2, d3, d4, d5, d6, d7, s0, s1, s2); 
+
+    output  out;
+    input d0, d1, d2, d3, d4, d5, d6, d7;
+    input s0, s1, s2; 
+    wire ns0, ns1,ns2, t0, t1, t2, t3, t4, t5, t6, t7;
+
+    not(ns0, s0);
+    not(ns1, s1);
+    not(ns2, s2);
+
+    and(t0, d0, ns0, ns1, ns2);//000
+    and(t1, d1, ns0, ns1, s2);//001
+    and(t2, d2, ns0, s1, ns2);//010
+    and(t3, d3, ns0, s1, s2);//011
+    and(t4, d4, s0, ns1, ns2);//100
+    and(t5, d5, s0, ns1, s2);//101
+    and(t6, d6, s0, s1, ns2);//110
+    and(t7, d7, s0, s1, s2);//111
+    or(out, t0,t1, t2, t3, t4, t5, t6, t7);
+endmodule
+
+module mux(out, a, b, c, d, e, f, g, h, s0, s1, s2); 
+parameter N = `NUM_BITS-1;
+    output [N:0] out;
+    input wire[N:0] a,b,c,d,e,f,g,h;
+    input s0,s1,s2;
+    generate
+        genvar i;
+        for(i=0;i<=N;i=i+1)begin
+            mux8x1 m(out[i],a[i],b[i],c[i],d[i],e[i],f[i],g[i],h[i],s0, s1, s2);
+        end
+    endgenerate
+endmodule
+
+module mux_test(result,carry,X,Y,enable,clk,s0,s1,s2); 
+    parameter N = `NUM_BITS-1;
+    input clk,enable,s0,s1,s2;
+    input [N:0] X,Y;
+
+    output [N:0] result;
+    output carry;
+
+    wire c0,c1,c2,c3,c4,c5,c6;
+    wire [N:0] a, b, c, d, e, f, g, h;
+    wire [N:0] not_Y;
+    NOT nt(not_Y,Y);
+
+    mux inputs( result,a, b, c, d, e, f, g, h, s0, s1, s2); 
+    mux8x1 carries(carry,c0,c1,c2,c3,c4,c5,c6,c7,s0,s1,s2);
+
+    full_adder_nbit add(a,c0,X,Y,enable);
+    full_adder_nbit sub(b,c1,X,not_Y,enable);
+    full_adder_nbit add_one(c,c2,X,Y,enable);
+    full_adder_nbit sub_one(d,c3,X,Y,enable);
+    Bitwise_AND bit_and(e,X,Y);
+    Bitwise_OR bit_or(f,X,Y);
+    BitWiseXor_n bit_xor(g,X,Y);
+    arithmetic_rightShift rightshift(h,X);
+    buf(c4,1'b0);buf(c5,1'b0);buf(c6,1'b0); buf(c7,1'b0);
+endmodule
+
+module main();
+    parameter N = `NUM_BITS-1;
+    wire [N:0] X=5'b11011, Y=5'b11010;
+    wire[N:0] Logic0;
+    wire[N:0] Logic1;
+    logi l0(Logic0,1'b0);
+    logi l1(Logic1,1'b1);
+    wire [N:0] r0,r1,r2,r3,r4,r5,r6,r7;
+    wire c0,c1,c2,c3,c4,c5,c6,c7,c8,e0,e1;
+    buf(e0,1'b0);
+    buf(e1,1'b1);
+    reg clk;
+    mux_test t0(r0,c0,X,Y,e0,clk,1'b0,1'b0,1'b0); //add
+    mux_test t1(r1,c1,X,Y,e1,clk,1'b0,1'b0,1'b1); //sub
+    mux_test t2(r2,c2,X,Logic0,e1,clk,1'b0,1'b1,1'b0); //incerement 1
+    mux_test t3(r3,c3,X,Logic1,e0,clk,1'b0,1'b1,1'b1); //decrement 1
+    mux_test t4(r4,c4,X,Y,e1,clk,1'b1,1'b0,1'b0); //AND
+    mux_test t5(r5,c5,X,Y,e1,clk,1'b1,1'b0,1'b1); //OR
+    mux_test t6(r6,c6,X,Y,e1,clk,1'b1,1'b1,1'b0); //XOR
+    mux_test t7(r7,c7,X,Y,e1,clk,1'b1,1'b1,1'b1); //shift right
+
+    initial begin
+    #20
+    clk <= 0;
+    #1 clk <= 1; 
+    #1 clk <= 0; 
+    $display("X=%b, Y=%b",X,Y);
+    $display("s=000(Add),          MSB= %b,  result=%b , carry=%b",c0, r0,c0);
+    $display("s=001(Sub),          MSB= %b,  result=%b , carry=%b",r1[N], r1,c1);
+    $display("s=010(Increment X),  MSB= %b,  result=%b , carry=%b",r2[N], r2,c2);
+    $display("s=011(Decrement X),  MSB= %b,  result=%b , carry=%b",r3[N], r3,c3);
+    $display("s=011(AND),          MSB= %b,  result=%b , carry=%b",r4[N], r4,c4);
+    $display("s=101(OR),           MSB= %b,  result=%b , carry=%b",r5[N], r5,c5);
+    $display("s=110(XOR),          MSB= %b,  result=%b , carry=%b",r6[N], r6,c6);
+    $display("s=111(shift right X),MSB= %b,  result=%b , carry=%b",r7[N], r7,c7);
+      
+    end
+
+endmodule
